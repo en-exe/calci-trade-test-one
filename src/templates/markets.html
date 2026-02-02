@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Scanner — Calci-Trade{% endblock %}
+{% block content %}
+<h2>Current Opportunities</h2>
+{% if opportunities %}
+<table>
+  <tr><th>Ticker</th><th>Title</th><th>YES Price</th><th>Side</th><th>Entry</th><th>Edge</th><th>Closes</th></tr>
+  {% for o in opportunities %}
+  <tr>
+    <td>{{ o.ticker }}</td>
+    <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ o.title }}</td>
+    <td>{{ o.yes_price }}¢</td>
+    <td>{{ o.side|upper }}</td>
+    <td>{{ o.entry_price }}¢</td>
+    <td>{{ "%.1f"|format(o.edge * 100) }}%</td>
+    <td>{{ o.close_time[:16] }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<p style="color:#8b949e">No opportunities detected in the last scan.</p>
+{% endif %}
+
+<h2 style="margin-top:24px">Recent Scans</h2>
+{% if recent_scans %}
+<table>
+  <tr><th>Time</th><th>Opportunities</th><th>Trades Placed</th></tr>
+  {% for s in recent_scans %}
+  <tr>
+    <td>{{ s.timestamp[:19] }}</td>
+    <td>{{ s.opportunities_found }}</td>
+    <td>{{ s.trades_placed }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<p style="color:#8b949e">No scans recorded yet.</p>
+{% endif %}
+{% endblock %}

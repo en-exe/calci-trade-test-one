@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Calci-Trade{% endblock %}
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+  <h2>Portfolio Overview</h2>
+  <form method="post" action="/toggle-pause">
+    <button class="btn" type="submit">{% if paused %}Resume Trading{% else %}Pause Trading{% endif %}</button>
+  </form>
+</div>
+
+<div class="cards">
+  <div class="card">
+    <div class="label">Balance</div>
+    <div class="value">${{ "%.2f"|format(balance / 100) }}</div>
+  </div>
+  <div class="card">
+    <div class="label">Total P&amp;L</div>
+    <div class="value {% if total_pnl >= 0 %}green{% else %}red{% endif %}">
+      ${{ "%.2f"|format(total_pnl / 100) }}
+    </div>
+  </div>
+  <div class="card">
+    <div class="label">Win Rate</div>
+    <div class="value">{{ win_rate }}%</div>
+  </div>
+  <div class="card">
+    <div class="label">W / L</div>
+    <div class="value">{{ wins }} / {{ losses }}</div>
+  </div>
+  <div class="card">
+    <div class="label">Total Trades</div>
+    <div class="value">{{ total_trades }}</div>
+  </div>
+  <div class="card">
+    <div class="label">Status</div>
+    <div class="value {% if paused %}red{% else %}green{% endif %}">
+      {% if paused %}PAUSED{% else %}ACTIVE{% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Activity Feed -->
+<div class="chart-box" style="margin-bottom:24px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <h2 style="margin-bottom:0">Live Activity</h2>
+    <span id="feed-status" style="font-size:11px;color:#3fb950">● Auto-refreshing</span>
+  </div>
+  <div id="activity-feed" style="max-height:300px;overflow-y:auto;font-family:monospace;font-size:12px;line-height:1.8">
+    {% for a in activity %}
+    <div class="log-entry log-{{ a.level }}">
+      <span style="color:#8b949e">{{ a.timestamp[11:19] }}</span>
+      {% if a.level == 'success' %}<span style="color:#3fb950">&#9679;</span>
+      {% elif a.level == 'warning' %}<span style="color:#d29922">&#9679;</span>
+      {% elif a.level == 'error' %}<span style="color:#f85149">&#9679;</span>
+      {% else %}<span style="color:#58a6ff">&#9679;</span>{% endif %}
+      {{ a.message }}
+    </div>
+    {% endfor %}
+    {% if not activity %}
+    <div style="color:#8b949e">Waiting for first scan cycle...</div>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+// Poll activity feed every 10 seconds
+setInterval(async () => {
+  try {
+    const res = await fetch('/api/activity');
+    const data = await res.json();
+    const feed = document.getElementById('activity-feed');
+    if (data.activity && data.activity.length > 0) {
+      feed.innerHTML = data.activity.map(a => {
+        const color = a.level === 'success' ? '#3fb950' :
+                      a.level === 'warning' ? '#d29922' :
+                      a.level === 'error' ? '#f85149' : '#58a6ff';
+        return `<div><span style="color:#8b949e">${a.timestamp.slice(11,19)}</span> <span style="color:${color}">&#9679;</span> ${a.message}</div>`;
+      }).join('');
+    }
+  } catch(e) {}
+}, 10000);
+</script>
+
+{% if snap_labels %}
+<div class="chart-box">
+  <h2>Equity Curve</h2>
+  <canvas id="equityChart" height="80"></canvas>
+</div>
+<script>
+new Chart(document.getElementById('equityChart'), {
+  type: 'line',
+  data: {
+    labels: {{ snap_labels | tojson }},
+    datasets: [{
+      label: 'Balance ($)',
+      data: {{ snap_values | tojson }},
+      borderColor: '#58a6ff',
+      backgroundColor: 'rgba(88,166,255,0.1)',
+      fill: true,
+      tension: 0.3,
+      pointRadius: 2,
+    }]
+  },
+  options: {
+    responsive: true,
+    scales: {
+      x: { ticks: { color: '#8b949e', maxTicksLimit: 10 }, grid: { color: '#21262d' } },
+      y: { ticks: { color: '#8b949e' }, grid: { color: '#21262d' } }
+    },
+    plugins: { legend: { labels: { color: '#c9d1d9' } } }
+  }
+});
+</script>
+{% endif %}
+
+<h2>Active Positions</h2>
+{% if open_trades %}
+<table>
+  <tr><th>Ticker</th><th>Side</th><th>Price</th><th>Qty</th><th>Time</th></tr>
+  {% for t in open_trades %}
+  <tr>
+    <td>{{ t.market_ticker }}</td>
+    <td>{{ t.side|upper }}</td>
+    <td>{{ t.price }}c</td>
+    <td>{{ t.quantity }}</td>
+    <td>{{ t.timestamp[:16] }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<p style="color:#8b949e">No active positions.</p>
+{% endif %}
+
+<h2 style="margin-top:24px">Today's Trades</h2>
+{% if today_trades %}
+<table>
+  <tr><th>Ticker</th><th>Side</th><th>Price</th><th>Qty</th><th>Status</th><th>P&amp;L</th><th>Time</th></tr>
+  {% for t in today_trades %}
+  <tr>
+    <td>{{ t.market_ticker }}</td>
+    <td>{{ t.side|upper }}</td>
+    <td>{{ t.price }}c</td>
+    <td>{{ t.quantity }}</td>
+    <td>{{ t.status }}</td>
+    <td class="{% if t.pnl >= 0 %}green{% else %}red{% endif %}">{{ t.pnl }}c</td>
+    <td>{{ t.timestamp[:16] }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<p style="color:#8b949e">No trades today.</p>
+{% endif %}
+{% endblock %}

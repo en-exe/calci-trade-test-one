@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Trade Log — Calci-Trade{% endblock %}
+{% block content %}
+<h2>Trade Log</h2>
+{% if trades %}
+<table>
+  <tr><th>ID</th><th>Ticker</th><th>Event</th><th>Side</th><th>Price</th><th>Qty</th><th>Order ID</th><th>Status</th><th>P&amp;L</th><th>Timestamp</th></tr>
+  {% for t in trades %}
+  <tr>
+    <td>{{ t.id }}</td>
+    <td>{{ t.market_ticker }}</td>
+    <td>{{ t.event_ticker }}</td>
+    <td>{{ t.side|upper }}</td>
+    <td>{{ t.price }}¢</td>
+    <td>{{ t.quantity }}</td>
+    <td style="font-size:11px">{{ t.order_id[:12] }}…</td>
+    <td>{{ t.status }}</td>
+    <td class="{% if t.pnl >= 0 %}green{% else %}red{% endif %}">{{ t.pnl }}¢</td>
+    <td>{{ t.timestamp[:19] }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<p style="color:#8b949e">No trades recorded yet.</p>
+{% endif %}
+{% endblock %}
