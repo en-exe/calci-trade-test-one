@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import logging
 import time
@@ -26,7 +27,7 @@ class KalshiClient:
         self._private_key: rsa.RSAPrivateKey = self._load_private_key()
         self._http: httpx.AsyncClient = httpx.AsyncClient(
             base_url=self._base_url,
-            timeout=30.0,
+            timeout=60.0,
         )
 
     # ------------------------------------------------------------------
@@ -89,21 +90,48 @@ class KalshiClient:
         *,
         params: dict[str, Any] | None = None,
         json: dict[str, Any] | None = None,
+        max_retries: int = 3,
     ) -> Any:
         url = f"{self._base_url}{endpoint}"
         path = urlparse(url).path
 
         headers = self._sign_request(method, path)
 
-        response = await self._http.request(
-            method,
-            endpoint,
-            params=params,
-            json=json,
-            headers=headers,
-        )
-        response.raise_for_status()
-        return response.json()
+        last_exc: Exception | None = None
+        for attempt in range(max_retries):
+            try:
+                response = await self._http.request(
+                    method,
+                    endpoint,
+                    params=params,
+                    json=json,
+                    headers=headers,
+                )
+                response.raise_for_status()
+                return response.json()
+            except httpx.TimeoutException as exc:
+                last_exc = exc
+                logger.warning(
+                    "Timeout on %s %s (attempt %d/%d)",
+                    method, endpoint, attempt + 1, max_retries,
+                )
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(2 * (attempt + 1))
+                    # Re-sign for fresh timestamp
+                    headers = self._sign_request(method, path)
+            except httpx.HTTPStatusError as exc:
+                if exc.response.status_code >= 500 and attempt < max_retries - 1:
+                    last_exc = exc
+                    logger.warning(
+                        "Server error %d on %s %s (attempt %d/%d)",
+                        exc.response.status_code, method, endpoint,
+                        attempt + 1, max_retries,
+                    )
+                    await asyncio.sleep(2 * (attempt + 1))
+                    headers = self._sign_request(method, path)
+                else:
+                    raise
+        raise last_exc  # type: ignore[misc]
 
     # ------------------------------------------------------------------
     # Public API methods

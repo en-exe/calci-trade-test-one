@@ -145,11 +145,12 @@ class Database:
                  COUNT(*) as total,
                  SUM(CASE WHEN status='settled' THEN 1 ELSE 0 END) as wins,
                  SUM(CASE WHEN status='lost' THEN 1 ELSE 0 END) as losses,
+                 SUM(CASE WHEN status='expired' THEN 1 ELSE 0 END) as expired,
                  SUM(pnl) as total_pnl
                FROM trades"""
         )
         row = await cur.fetchone()
-        return dict(row) if row else {"total": 0, "wins": 0, "losses": 0, "total_pnl": 0}
+        return dict(row) if row else {"total": 0, "wins": 0, "losses": 0, "expired": 0, "total_pnl": 0}
 
     # ---- portfolio snapshots ----
 

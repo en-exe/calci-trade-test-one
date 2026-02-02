@@ -14,6 +14,7 @@ from src.dashboard import app, init_dashboard
 from src.db import Database
 from src.executor import execute_signals
 from src.kalshi_client import KalshiClient
+from src.reconciler import reconcile_trades
 from src.scanner import scan_markets
 from src.strategy import score_opportunities
 
@@ -60,6 +61,11 @@ async def trading_loop(client: KalshiClient, db: Database) -> None:
             await db.log_activity(
                 f"Balance fetched: ${balance / 100:.2f}", "info"
             )
+
+            # Reconcile open trades
+            reconciled = await reconcile_trades(client, db)
+            if reconciled:
+                await db.log_activity(f"Reconciled {reconciled} open trades.", "info")
 
             # Scan
             await db.log_activity("Scanning markets for opportunities...", "info")
